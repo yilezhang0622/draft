@@ -1,0 +1,186 @@
+---
+output: pdf_document
+graphics: yes
+header-includes:
+    - \usepackage{tabu}
+    - \usepackage{amssymb, amsmath, amsthm}
+    - \usepackage{enumerate}
+    - \renewcommand{\P}{\textrm{P}}
+    - \newcommand{\R}{\mathbb{R}}
+    - \newcommand{\E}{\mathbb{E}}
+    - \newcommand{\var}{{\rm Var}}
+    - \newcommand{\cov}{{\rm Cov}}
+    - \newcommand{\iid}{\stackrel{iid}{\sim}}
+    - \newcommand{\N}{\mathcal{N}}
+---
+\noindent \begin{tabu} to \textwidth {@{}X[4 l] @{}X[r]}
+  \textbf{Problem Set 4} 	       & \\ 
+  \textbf{Mgmt 237Q: Econometrics} & \\ 
+  \textbf{Professor Rossi}		   & 
+\end{tabu}
+
+This problem set is designed to review material on time series and advanced regression topics. Include both your R code and output in your answers.
+
+## Question 1
+
+Simulate data for the following models and provide a plot of each:
+
+a. A linear time trend: $y_t = \alpha + \beta t + \varepsilon_t$
+```{r}
+n <- 1000
+beta0 <- 1
+beta1 <- 10
+sigma <- 1
+set.seed(123)
+t = seq(0,1000,1)
+y =beta0+beta1*t+rnorm(length(t),sd=sigma)
+linear <- ts(data=y)
+```
+
+b. An AR(1): $y_t = \alpha + \beta y_{t-1} + \varepsilon_t$
+```{r}
+ar_1 <- arima.sim(model=list(ar=0.5),n=1000)
+```
+
+c. A random walk: $y_t = y_{t-1} + \varepsilon_t$
+
+```{r}
+random_walk <- arima.sim(model = list(order=c(0,1,0)), n = 1000)
+plot.ts(cbind(linear,ar_1,random_walk))
+```
+
+
+## Question 2
+
+a. Using the `beerprod` data from the `DataAnalytics` package, regress beer production on its 1-period, 6-period, and 12-period lags. This should be one regression, not three separate regressions.
+```{r}
+library(DataAnalytics)
+data(beerprod)
+lmSumm(lm(b_prod~back(b_prod),data=beerprod))
+out.ar=lm(b_prod~back(b_prod),data=beerprod)
+```
+
+b. Test to see if there is any autocorrelation left in the residuals. Comment on what you find.
+From the graph, we can see that there is a lot of auto-correlation left in. Especially at lag 6 and lag 12. This means 
+```{r}
+acf(out.ar$res)
+```
+
+c. Predict beer production for the next 20 months. Plot your prediction.
+```{r}
+
+nstep=20
+pred.ar=double(nstep+1)
+pred.ar[1]=beerprod$b_prod[length(beerprod)]
+for(i in 1:nstep){
+  pred.ar[i+1]= out.ar$coef[1]+out.ar$coef[2]*pred.ar[i]
+}
+plot(pred.ar)
+```
+
+
+
+## Question 3
+
+a. Assuming the AR(1) model is stationary, prove that the coefficient on the lagged dependent variable ($\beta$) is equal to the correlation between the dependent variable and its lag ($\rho$).
+b. In the lecture slides for Chapter 4, slide 15 states, "if all the true autocorrelations are 0, then the standard deviation of the sample autocorrelations is about $1/\sqrt{T}$". Prove this for an AR(1) model.  (Hint: recall the formula for $s_{b_1}$ from the Chapter 1 slides.)
+
+
+## Question 4
+
+Let's explore the log transformation to address nonlinearity and heterogeneity using the `diamonds` dataset in the `ggplot2` package. Because this is a large dataset, we will focus only on the subset of the data where the cut is "ideal" and the color is "D". Thus, for this question, you should be working with 2,834 data points.
+
+a) Plot (1) carat vs price, and (2) log(carat) vs log(price). Use `par(mfrow=c(1,2))` to put two plots side by side.
+```{r}
+library(ggplot2)
+data(diamonds)
+df1 <- subset(diamonds, cut == "Ideal" & color=="D")
+par(mfrow=c(1,2))
+plot(df1$carat,df1$price)
+plot(log(df1$carat),log(df1$price))
+```
+
+b) Regress log(price) on log(carat) and dummy variables for the levels of clarity. What price premium does a diamond with clarity "IF" command relative to a diamond with clarity "SI2"?
+```{r}
+out <- lm(data=df1,log(price)~log(carat)+clarity)
+summary(out)
+df1$predictedPrice <- fitted(out)
+
+```
+
+c) Repeat the second plot in part (a) above (i.e., log(carat) vs log(price)) but make 2 additions. First, color each point by its level of clarity. Second, add the fitted regression lines for the following two levels clarity: "IF" and "SI1". Be sure to match the color of each line to the color of the corresponding points.
+```{r}
+par(mfrow=c(1,2))
+ggplot(data=df1)+geom_point(aes(x=log(carat),y=log(price)))+geom_abline()
+plot(log(df1$carat),log(df1$price))
+
+ggplot(data=frontier)+geom_point(aes(x=sigma,y=return_w),colour="black",size=0.1)+
+  geom_point(data=frontier[frontier$sigma==min(frontier$sigma),],aes(x=sigma,y=return_w),colour="red",size=2)+
+  geom_abline(intercept=avg_rf,slope=max(frontier$sharpe_ratio_w),colour="green",size=1)+
+  geom_point(data=solution,aes(x=sd_s,y=etarget),colour="black",size=1)+
+  coord_cartesian(xlim=c(0,0.05), ylim=c(0, 0.005))+
+  geom_point(data=solution[solution$sd_s==min(solution$sd_s),],aes(x=sd_s,y=etarget),colour="red",size=2)+
+  geom_abline(intercept=avg_rf,slope=max(solution$sharpe_ratio_s),colour="blue",size=1)+
+  labs(title="portfolio Frontier",x="standard deviation",y="Expected return")
+```
+
+
+## Question 5
+
+a. Using the `R` dataset `mtcars`, calculate the correlation between vehicle fuel efficiency (as measured by `mpg`) and engine displacement (`disp`).         
+The correlation between vehicle fuel efficiency and engine displacement is -0.85.
+```{r}
+data("mtcars")
+corr(cbind(mtcars$mpg,mtcars$disp))
+```
+
+b. Write R code to construct a bootstrapped 95\% confidence interval for the correlation. Provide the confidence interval in your answer.       
+The confidence intervral is (-0.9034807 -0.7789556).
+```{r}
+data("mtcars")
+library(boot)
+foo <- quantile(boot(cbind(mtcars$mpg,mtcars$disp),
+            function(data,indices){
+              dt <- data[indices,]
+              c(corr(dt))
+              },
+            R=10000
+            )$t,
+            c(0.05,0.95)
+);foo
+foo1 <- boot(cbind(mtcars$mpg,mtcars$disp),
+            function(data,indices){
+              dt <- data[indices,]
+              c(corr(dt))
+              },
+            R=10000
+)
+quantile(foo1$t,c(0.05,0.95))
+
+foo2 <-    function(data,indices){
+              dt <- data[indices,]
+              c(
+                corr(dt)
+                )
+              }
+quantile(boot(cbind(mtcars$mpg,mtcars$disp),foo2,R=10000)$t,c(0.05,0.95))
+
+```
+
+c. Plot the distribution of your bootstrapped correlations and label (on the plot) the sample correlation calculated in part (a).
+```{r}
+result <- boot(cbind(mtcars$mpg,mtcars$disp),
+            function(data,indices){
+              dt <- data[indices,]
+              c(corr(dt))
+              },
+            R=10000
+            )
+a <- ggplot()+aes(result$t)+geom_histogram(colour="black",fill="white")
+a+geom_errorbar(aes(xmin=foo[1],xmax=foo[2]),width=0.2,colour="red")
+d <- density(result$t)
+plot(d)
+```
+
+
+
